@@ -237,6 +237,56 @@ namespace CounterFunctions
 
             return st;
         }
+        [FunctionName("update-User")]
+        public static async Task<String> updateUser(
+          [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "update-User/{act}/{name}")] HttpRequestMessage request,
+          [Table("Users")] CloudTable cloudTable,
+          string name,
+          string act,
+          ILogger log)
+        {
+            Console.Out.WriteLine("in updateUser");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+                Console.WriteLine("111111111111");
+                table = client.GetTableReference("Table00"+name);
+                Console.WriteLine("22222222222222222");
+                await table.CreateIfNotExistsAsync();
+                Console.WriteLine("333333333333333333333333");
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            Console.Out.WriteLine("in remove");
+            if (act.Equals("remove")) {
+                
+                await table.DeleteIfExistsAsync();
+                //delete user from Users
+                TableOperation retrieve = TableOperation.Retrieve<User>(name, "");
+                CloudTable usersTable = client.GetTableReference("Users");
+                await usersTable.CreateIfNotExistsAsync();
+                TableResult result = await usersTable.ExecuteAsync(retrieve);
+
+                var deleteEntity = (User)result.Result;
+
+                TableOperation delete = TableOperation.Delete(deleteEntity);
+
+                await usersTable.ExecuteAsync(delete);
+                return act + " " + name;
+
+            }
+            return act +" "+ name +" Out";
+
+        }
 
         [FunctionName("get-All-Users")]
         public static async Task<List<User>> GetUsers(
@@ -273,7 +323,6 @@ namespace CounterFunctions
             List<User> users = new List<User>();
             foreach (User entity in  await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null))
             {
-                Console.WriteLine("{0}, {1}", entity.PartitionKey, entity.RowKey);
                 User user = new User();
                 user.UserName = entity.PartitionKey;
 
