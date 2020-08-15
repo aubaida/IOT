@@ -25,7 +25,7 @@ namespace CounterFunctions
         private static readonly AzureSignalR SignalR = new AzureSignalR(Environment.GetEnvironmentVariable("AzureSignalRConnectionString"));
       //  static string accountName = "firsttry1";
       //  static string accountKey = "pfXP7PSpVukhCQmIKLv44hRo93hnZWuyt3D/TVL5+ImwIeXX0BAOlMvhsBV96eD5rbS465e8I/6JgQmsV4tlzg==";
-        [FunctionName("negotiate")]
+     /*   [FunctionName("negotiate")]
         public static async Task<SignalRConnectionInfo> NegotiateConnection(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage request,
             ILogger log)
@@ -189,7 +189,7 @@ namespace CounterFunctions
             return retList;
 
         }
-
+*/
         [FunctionName("get-isOpen")]
         public static async Task<status> GetIfIsOpen(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-isOpen/{id}")] HttpRequestMessage request,
@@ -255,20 +255,18 @@ namespace CounterFunctions
                 CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
 
                 client = account.CreateCloudTableClient();
-                Console.WriteLine("111111111111");
                 table = client.GetTableReference("Table00"+name);
-                Console.WriteLine("22222222222222222");
-                await table.CreateIfNotExistsAsync();
-                Console.WriteLine("333333333333333333333333");
+                
                 Console.WriteLine(table.Uri.ToString());
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
             }
-            Console.Out.WriteLine("in remove");
-            if (act.Equals("remove")) {
-                
+            
+            if (act.Equals("remove"))
+            {
+                Console.Out.WriteLine("in remove");
                 await table.DeleteIfExistsAsync();
                 //delete user from Users
                 TableOperation retrieve = TableOperation.Retrieve<User>(name, "");
@@ -281,18 +279,35 @@ namespace CounterFunctions
                 TableOperation delete = TableOperation.Delete(deleteEntity);
 
                 await usersTable.ExecuteAsync(delete);
+                
                 return act + " " + name;
 
             }
-            return act +" "+ name +" Out";
+            else if (act == "add") {
+                Console.Out.WriteLine("in add");
+                await table.CreateIfNotExistsAsync();
+                CloudTable usersTable = client.GetTableReference("Users");
+                await usersTable.CreateIfNotExistsAsync();
+
+                TableEntity newUser = new TableEntity();
+                newUser.PartitionKey = name;
+                newUser.RowKey = "";
+
+                TableOperation add = TableOperation.InsertOrReplace(newUser);
+                await usersTable.ExecuteAsync(add);
+
+                return act + " " + name ;
+
+            }
+            return act +" "+ name +" error in action";
 
         }
 
         [FunctionName("get-All-Users")]
-        public static async Task<List<User>> GetUsers(
-           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-All-Users/{id}")] HttpRequestMessage request,
+        public static async Task<List<string>> GetUsers(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-All-Users/")] HttpRequestMessage request,
            [Table("Users")] CloudTable cloudTable,
-           string id,
+           
            ILogger log)
         {
             Console.WriteLine("in get-All-Users");
@@ -317,20 +332,184 @@ namespace CounterFunctions
             Console.WriteLine("callin GetUsersFromTable");
             return await GetUsersFromTable(table);
         }
-        private static async Task<List<User>> GetUsersFromTable(CloudTable cloudTable)
+        private static async Task<List<string>> GetUsersFromTable(CloudTable cloudTable)
         {
             TableQuery<User> idQuery = new TableQuery<User>();
-            List<User> users = new List<User>();
+            List<string> users = new List<string>();
             foreach (User entity in  await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null))
             {
                 User user = new User();
                 user.UserName = entity.PartitionKey;
 
-                users.Add(user);
+                users.Add(user.UserName);
             }
             return users;
         }
 
+
+
+
+        [FunctionName("add-PlateNumber")]
+        public static async Task<String> GetaddPlateNymber(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "add-PlateNumber/{user}/{id}/{owner}")] HttpRequestMessage request,
+            string id,
+            string user,
+            string owner,
+            ILogger log)
+        {
+            log.LogInformation("add PlateNumber.");
+            //addition
+            CloudTable table = null;
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                CloudTableClient client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Table00"+user);
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+ 
+            return await updatePlateNumber(table, id, owner , "add");
+        }
+
+        [FunctionName("remove-PlateNumber")]
+        public static async Task<String> GetRemovePlateNymber(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "remove-PlateNumber/{user}/{id}/{owner}")] HttpRequestMessage request,
+            string id,
+            string user,
+            string owner,
+            ILogger log)
+        {
+            log.LogInformation("remove PlateNumber.");
+            //addition
+            CloudTable table = null;
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                CloudTableClient client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Table00" + user);
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+
+            return await updatePlateNumber(table, id, owner, "remove");
+        }
+
+
+        private static async Task<String> updatePlateNumber(CloudTable cloudTable, string id, string owner, string action)
+        {
+            if (action.Equals("add")) { 
+            try
+            {
+                PlateNumber newPlate = new PlateNumber();
+                newPlate.PartitionKey = owner;
+                newPlate.RowKey = id;
+
+                TableOperation add = TableOperation.InsertOrReplace(newPlate);
+                await cloudTable.ExecuteAsync(add);
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
+            return "Success";
+            // action=='remove'
+            }else{
+                try
+                {
+                    List<string> list = new List<string>();
+                    list.Add(id);
+                    TableOperation retrieve = TableOperation.Retrieve<PlateNumber>(owner, id);
+
+                    TableResult result = await cloudTable.ExecuteAsync(retrieve);
+
+                    var deleteEntity = (PlateNumber)result.Result;
+
+                    TableOperation delete = TableOperation.Delete(deleteEntity);
+
+                    await cloudTable.ExecuteAsync(delete);
+                }
+                catch (Exception e)
+                {
+                    return e.Message;
+                }
+                return "Success";
+            }
+        }
+        [FunctionName("get-regestered-cars")]
+        public static async Task<List<TableEntity>> GetRegesteredCar(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-regestered-cars/{user}")] HttpRequestMessage request,
+           string user,
+           ILogger log)
+        {
+            log.LogInformation("GetRegesteredCar");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+            //first get all users
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Users");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            List<string> users;
+            if (user.Equals("admin")) { 
+                users = await GetUsersFromTable(table);
+            }else{
+                users = new List<string>();
+                users.Add(user);
+            }
+        
+            List<TableEntity> cars = new List<TableEntity>();
+            foreach (string regesterdUser in users) {
+                if (regesterdUser.Equals("admin")) {
+                    continue;
+                }
+                CloudTable usersTable = client.GetTableReference("Table00"+ regesterdUser);
+                await usersTable.CreateIfNotExistsAsync();
+                TableQuery<User> idQuery = new TableQuery<User>();
+                foreach (User entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
+                {
+                    cars.Add((User)entity);
+                }
+            }
+
+            return cars;
+        }
+
+    }
+
+
+
+
+
     }
     
-}
+
