@@ -8,7 +8,7 @@ namespace CounterFunctions
     public class User : TableEntity
     {
         public string UserName { get; set; }
+        public string Password { get; set; }
 
-        
     }
 }

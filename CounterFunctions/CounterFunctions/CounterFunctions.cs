@@ -269,12 +269,12 @@ namespace CounterFunctions
                 Console.Out.WriteLine("in remove");
                 await table.DeleteIfExistsAsync();
                 //delete user from Users
-                TableOperation retrieve = TableOperation.Retrieve<User>(name, "");
+                TableOperation retrieve = TableOperation.Retrieve<TableEntity>(name, "");
                 CloudTable usersTable = client.GetTableReference("Users");
                 await usersTable.CreateIfNotExistsAsync();
                 TableResult result = await usersTable.ExecuteAsync(retrieve);
 
-                var deleteEntity = (User)result.Result;
+                var deleteEntity = (TableEntity)result.Result;
 
                 TableOperation delete = TableOperation.Delete(deleteEntity);
 
@@ -289,9 +289,10 @@ namespace CounterFunctions
                 CloudTable usersTable = client.GetTableReference("Users");
                 await usersTable.CreateIfNotExistsAsync();
 
-                TableEntity newUser = new TableEntity();
+                User newUser = new User();
                 newUser.PartitionKey = name;
                 newUser.RowKey = "";
+                newUser.Password = name;
 
                 TableOperation add = TableOperation.InsertOrReplace(newUser);
                 await usersTable.ExecuteAsync(add);
@@ -334,14 +335,14 @@ namespace CounterFunctions
         }
         private static async Task<List<string>> GetUsersFromTable(CloudTable cloudTable)
         {
-            TableQuery<User> idQuery = new TableQuery<User>();
+            TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
             List<string> users = new List<string>();
-            foreach (User entity in  await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null))
+            foreach (TableEntity entity in  await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null))
             {
-                User user = new User();
-                user.UserName = entity.PartitionKey;
+                TableEntity user = new TableEntity();
+                user.PartitionKey = entity.PartitionKey;
 
-                users.Add(user.UserName);
+                users.Add(user.PartitionKey);
             }
             return users;
         }
@@ -494,20 +495,115 @@ namespace CounterFunctions
                 }
                 CloudTable usersTable = client.GetTableReference("Table00"+ regesterdUser);
                 await usersTable.CreateIfNotExistsAsync();
-                TableQuery<User> idQuery = new TableQuery<User>();
-                foreach (User entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
+                TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
+                foreach (TableEntity entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
                 {
-                    cars.Add((User)entity);
+                    cars.Add((TableEntity)entity);
                 }
             }
 
             return cars;
         }
 
+        [FunctionName("post-login")]
+        public static async Task<String> isLogin(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
+           ILogger log)
+        {
+            log.LogInformation("is login.");
+            String result= "false";
+            CloudTable table = null;
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                CloudTableClient client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Users");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            User userLoginRequest = await ExtractContent<User>(request);
+
+            TableQuery<User> idQuery = new TableQuery<User>()
+               .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userLoginRequest.PartitionKey));
+            TableQuerySegment<User> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
+            User user = queryResult.FirstOrDefault();
+
+            if (user == null)
+            {
+                result = "false";
+            }
+            else {
+                if (user.Password.Equals(userLoginRequest.Password)) {
+                    result = "true";
+                }
+                else { result = "false"; }
+            }
+            return result;
+
+        }
+        [FunctionName("post-changePass")]
+        public static async Task<String> changePass(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
+           ILogger log)
+        {
+            log.LogInformation("is login.");
+            String result = "false";
+            CloudTable table = null;
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                CloudTableClient client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Users");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            User userLoginRequest = await ExtractContent<User>(request);
+
+            TableQuery<User> idQuery = new TableQuery<User>()
+               .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userLoginRequest.PartitionKey));
+            TableQuerySegment<User> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
+            User user = queryResult.FirstOrDefault();
+
+            if (user == null)
+            {
+                result = "notChanged";
+            }
+            else
+            {
+                user.Password = userLoginRequest.Password;
+                
+                TableOperation add = TableOperation.InsertOrReplace(user);
+                await table.ExecuteAsync(add);
+                result = "changed";
+            }
+            return result;
+
+        }
+        private static async Task<T> ExtractContent<T>(HttpRequestMessage request)
+        {
+            string connectionRequestJson = await request.Content.ReadAsStringAsync();
+            Console.Out.Write("the connectionRequestJson is :   " + connectionRequestJson + "\n");
+            return JsonConvert.DeserializeObject<T>(connectionRequestJson);
+        }
+
+       
     }
-
-
-
 
 
     }
