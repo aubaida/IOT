@@ -454,7 +454,7 @@ namespace CounterFunctions
             }
         }
         [FunctionName("get-regestered-cars")]
-        public static async Task<List<TableEntity>> GetRegesteredCar(
+        public static async Task<List<User>> GetRegesteredCar(
            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-regestered-cars/{user}")] HttpRequestMessage request,
            string user,
            ILogger log)
@@ -488,17 +488,18 @@ namespace CounterFunctions
                 users.Add(user);
             }
         
-            List<TableEntity> cars = new List<TableEntity>();
+            List<User> cars = new List<User>();
             foreach (string regesterdUser in users) {
                 if (regesterdUser.Equals("admin")) {
                     continue;
                 }
                 CloudTable usersTable = client.GetTableReference("Table00"+ regesterdUser);
                 await usersTable.CreateIfNotExistsAsync();
-                TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
-                foreach (TableEntity entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
+                TableQuery<User> idQuery = new TableQuery<User>();
+                foreach (User entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
                 {
-                    cars.Add((TableEntity)entity);
+                    entity.UserName = regesterdUser;
+                    cars.Add((User)entity);
                 }
             }
 
