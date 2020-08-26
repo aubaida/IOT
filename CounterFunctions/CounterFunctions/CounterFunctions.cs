@@ -23,191 +23,192 @@ namespace CounterFunctions
         private static string connectionString = "HostName=FirstTry1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=pM+0OHYzhamTy1GSRFfasj7q7Hi2TARGlVr9yb7dNuk=";
         //end_add
         private static readonly AzureSignalR SignalR = new AzureSignalR(Environment.GetEnvironmentVariable("AzureSignalRConnectionString"));
-      //  static string accountName = "firsttry1";
-      //  static string accountKey = "pfXP7PSpVukhCQmIKLv44hRo93hnZWuyt3D/TVL5+ImwIeXX0BAOlMvhsBV96eD5rbS465e8I/6JgQmsV4tlzg==";
-     /*   [FunctionName("negotiate")]
-        public static async Task<SignalRConnectionInfo> NegotiateConnection(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage request,
-            ILogger log)
-        {
-            try
-            {
-                ConnectionRequest connectionRequest = await ExtractContent<ConnectionRequest>(request);
-                log.LogInformation($"Negotiating connection for user: <{connectionRequest.UserId}>.");
+        //  static string accountName = "firsttry1";
+        //  static string accountKey = "pfXP7PSpVukhCQmIKLv44hRo93hnZWuyt3D/TVL5+ImwIeXX0BAOlMvhsBV96eD5rbS465e8I/6JgQmsV4tlzg==";
+        /*   [FunctionName("negotiate")]
+           public static async Task<SignalRConnectionInfo> NegotiateConnection(
+               [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage request,
+               ILogger log)
+           {
+               try
+               {
+                   ConnectionRequest connectionRequest = await ExtractContent<ConnectionRequest>(request);
+                   log.LogInformation($"Negotiating connection for user: <{connectionRequest.UserId}>.");
 
-                string clientHubUrl = SignalR.GetClientHubUrl("CounterHub");
-                string accessToken = SignalR.GenerateAccessToken(clientHubUrl, connectionRequest.UserId);
-                
-                return new SignalRConnectionInfo { AccessToken = accessToken, Url = clientHubUrl };
-            }
-            catch (Exception ex)
-            {
-                log.LogError(ex, "Failed to negotiate connection.");
-                throw;
-            }
-        }
-        //addition
-        //public static CloudTable table;
-        //end_addition
-        [FunctionName("update-counter")]
-        public static async Task UpdateCounter(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
-            [Table("CountersTable")] CloudTable cloudTable,
-            [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
-            ILogger log)
-        {
-            //addition
-            CloudTable table=null;
-            try
-            {
-                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable( "accountKey"));
-                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+                   string clientHubUrl = SignalR.GetClientHubUrl("CounterHub");
+                   string accessToken = SignalR.GenerateAccessToken(clientHubUrl, connectionRequest.UserId);
 
-                CloudTableClient client = account.CreateCloudTableClient();
+                   return new SignalRConnectionInfo { AccessToken = accessToken, Url = clientHubUrl };
+               }
+               catch (Exception ex)
+               {
+                   log.LogError(ex, "Failed to negotiate connection.");
+                   throw;
+               }
+           }
+           //addition
+           //public static CloudTable table;
+           //end_addition
+           [FunctionName("update-counter")]
+           public static async Task UpdateCounter(
+               [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
+               [Table("CountersTable")] CloudTable cloudTable,
+               [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
+               ILogger log)
+           {
+               //addition
+               CloudTable table=null;
+               try
+               {
+                   StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable( "accountKey"));
+                   CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
 
-                table = client.GetTableReference("counters");
-                await table.CreateIfNotExistsAsync();
+                   CloudTableClient client = account.CreateCloudTableClient();
 
-                Console.WriteLine(table.Uri.ToString());
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
-           // table = new CloudTable(siteURL);
-            //end_addition
-            log.LogInformation("Updating counter.");
+                   table = client.GetTableReference("counters");
+                   await table.CreateIfNotExistsAsync();
 
-            Counter counterRequest = await ExtractContent<Counter>(request);
+                   Console.WriteLine(table.Uri.ToString());
+               }
+               catch (Exception ex)
+               {
+                   Console.WriteLine(ex);
+               }
+              // table = new CloudTable(siteURL);
+               //end_addition
+               log.LogInformation("Updating counter.");
 
-            Counter cloudCounter = await GetOrCreateCounter(table, counterRequest.Id);
-            cloudCounter.Count++;
-            log.LogInformation("************the cloud counter ID="+ cloudCounter.Id+" ,count="+ cloudCounter.Count);
-            ConnectionRequest connectionRequest = await ExtractContent<ConnectionRequest>(request);
-            TableOperation updateOperation = TableOperation.InsertOrReplace(cloudCounter);
-            await table.ExecuteAsync(updateOperation);
+               Counter counterRequest = await ExtractContent<Counter>(request);
 
-            await signalRMessages.AddAsync(
-                new SignalRMessage
-                {
-                    Target = "CounterUpdate",
-                    Arguments = new object[] { cloudCounter }
-                });
-        }
+               Counter cloudCounter = await GetOrCreateCounter(table, counterRequest.Id);
+               cloudCounter.Count++;
+               log.LogInformation("************the cloud counter ID="+ cloudCounter.Id+" ,count="+ cloudCounter.Count);
+               ConnectionRequest connectionRequest = await ExtractContent<ConnectionRequest>(request);
+               TableOperation updateOperation = TableOperation.InsertOrReplace(cloudCounter);
+               await table.ExecuteAsync(updateOperation);
 
-        [FunctionName("get-counter")]
-        public static async Task<Counter> GetCounter(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-counter/{id}")] HttpRequestMessage request,
-            [Table("CountersTable")] CloudTable cloudTable,
-            string id,
-            ILogger log)
-        {
-            log.LogInformation("Getting counter.");
-            //addition
-            CloudTable table = null;
-            try
-            {
-                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
-                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+               await signalRMessages.AddAsync(
+                   new SignalRMessage
+                   {
+                       Target = "CounterUpdate",
+                       Arguments = new object[] { cloudCounter }
+                   });
+           }
 
-                CloudTableClient client = account.CreateCloudTableClient();
+           [FunctionName("get-counter")]
+           public static async Task<Counter> GetCounter(
+               [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-counter/{id}")] HttpRequestMessage request,
+               [Table("CountersTable")] CloudTable cloudTable,
+               string id,
+               ILogger log)
+           {
+               log.LogInformation("Getting counter.");
+               //addition
+               CloudTable table = null;
+               try
+               {
+                   StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                   CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
 
-                table = client.GetTableReference("counters");
-                await table.CreateIfNotExistsAsync();
+                   CloudTableClient client = account.CreateCloudTableClient();
 
-                Console.WriteLine(table.Uri.ToString());
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
-            // table = new CloudTable(siteURL);
-            //end_addition
-            return await GetOrCreateCounter(table, int.Parse(id));
-        }
+                   table = client.GetTableReference("counters");
+                   await table.CreateIfNotExistsAsync();
 
-        private static async Task<T> ExtractContent<T>(HttpRequestMessage request)
-        {
-            string connectionRequestJson = await request.Content.ReadAsStringAsync();
-            Console.Out.Write("the connectionRequestJson is :   "+connectionRequestJson +"\n");
-            return JsonConvert.DeserializeObject<T>(connectionRequestJson);
-        }
+                   Console.WriteLine(table.Uri.ToString());
+               }
+               catch (Exception ex)
+               {
+                   Console.WriteLine(ex);
+               }
+               // table = new CloudTable(siteURL);
+               //end_addition
+               return await GetOrCreateCounter(table, int.Parse(id));
+           }
 
-        private static async Task<Counter> GetOrCreateCounter(CloudTable cloudTable, int counterId)
-        {
-            TableQuery<Counter> idQuery = new TableQuery<Counter>()
-                .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, counterId.ToString()));
-         //   Console.Out.Write("111111111111111111111111111111\n");
-            TableQuerySegment<Counter> queryResult = await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null);
-        //    Console.Out.Write("12222222222222222222222222222\n");
-            Counter cloudCounter = queryResult.FirstOrDefault();
-        //    Console.Out.Write("3333333333333333333333333333333333333333\n");
-            if (cloudCounter == null)
-            { 
-                cloudCounter = new Counter { Id = counterId };
+           private static async Task<T> ExtractContent<T>(HttpRequestMessage request)
+           {
+               string connectionRequestJson = await request.Content.ReadAsStringAsync();
+               Console.Out.Write("the connectionRequestJson is :   "+connectionRequestJson +"\n");
+               return JsonConvert.DeserializeObject<T>(connectionRequestJson);
+           }
 
-                TableOperation insertOperation = TableOperation.InsertOrReplace(cloudCounter);
-                cloudCounter.PartitionKey = "counter";
-                cloudCounter.RowKey = cloudCounter.Id.ToString();
-                TableResult tableResult = await cloudTable.ExecuteAsync(insertOperation);
-                return await GetOrCreateCounter(cloudTable, counterId);
-            }
+           private static async Task<Counter> GetOrCreateCounter(CloudTable cloudTable, int counterId)
+           {
+               TableQuery<Counter> idQuery = new TableQuery<Counter>()
+                   .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, counterId.ToString()));
+            //   Console.Out.Write("111111111111111111111111111111\n");
+               TableQuerySegment<Counter> queryResult = await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null);
+           //    Console.Out.Write("12222222222222222222222222222\n");
+               Counter cloudCounter = queryResult.FirstOrDefault();
+           //    Console.Out.Write("3333333333333333333333333333333333333333\n");
+               if (cloudCounter == null)
+               { 
+                   cloudCounter = new Counter { Id = counterId };
 
-            return cloudCounter;
-        }
-        [FunctionName("get-devices")]
-        public static async Task<Device[]> getDevices(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
-            [Table("CountersTable")] CloudTable cloudTable,
-            [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
-            ILogger log)
-        {
-            log.LogInformation("getting the devices.");
-            List<string> devices = new List<string>();
+                   TableOperation insertOperation = TableOperation.InsertOrReplace(cloudCounter);
+                   cloudCounter.PartitionKey = "counter";
+                   cloudCounter.RowKey = cloudCounter.Id.ToString();
+                   TableResult tableResult = await cloudTable.ExecuteAsync(insertOperation);
+                   return await GetOrCreateCounter(cloudTable, counterId);
+               }
 
-            //add
-            registryManager = RegistryManager.CreateFromConnectionString(connectionString);
-            IQuery query = registryManager.CreateQuery("SELECT * FROM devices", 100);
-            while (query.HasMoreResults)
-            {
-                var page = await query.GetNextAsTwinAsync();
-                foreach (var twin in page)
-                {
-                    Console.Out.Write("the twin DeviceId :" + twin.DeviceId + "\n");
-                    devices.Add(twin.DeviceId);
-                }
-            }
-            //end_add
-            Device[] retList = new Device[devices.Count];
-            int index = 0;
-            foreach (string s in devices) {
-                Device d = new Device();
-                d.id = s;
-                retList[index]=d;
-                index++;
-            }
-            return retList;
+               return cloudCounter;
+           }
+           [FunctionName("get-devices")]
+           public static async Task<Device[]> getDevices(
+               [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequestMessage request,
+               [Table("CountersTable")] CloudTable cloudTable,
+               [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
+               ILogger log)
+           {
+               log.LogInformation("getting the devices.");
+               List<string> devices = new List<string>();
 
-        }
-*/
+               //add
+               registryManager = RegistryManager.CreateFromConnectionString(connectionString);
+               IQuery query = registryManager.CreateQuery("SELECT * FROM devices", 100);
+               while (query.HasMoreResults)
+               {
+                   var page = await query.GetNextAsTwinAsync();
+                   foreach (var twin in page)
+                   {
+                       Console.Out.Write("the twin DeviceId :" + twin.DeviceId + "\n");
+                       devices.Add(twin.DeviceId);
+                   }
+               }
+               //end_add
+               Device[] retList = new Device[devices.Count];
+               int index = 0;
+               foreach (string s in devices) {
+                   Device d = new Device();
+                   d.id = s;
+                   retList[index]=d;
+                   index++;
+               }
+               return retList;
+
+           }
+   */
         [FunctionName("get-isOpen")]
         public static async Task<status> GetIfIsOpen(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-isOpen/{id}")] HttpRequestMessage request,
-            [Table("Garage")] CloudTable cloudTable,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-isOpen/{id}/{state}")] HttpRequestMessage request,
             string id,
+            string state,
             ILogger log)
         {
             log.LogInformation("Getting if to open or not.");
             //addition
             CloudTable table = null;
+            CloudTableClient client=null;
             try
             {
                 StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
                 CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
 
-                CloudTableClient client = account.CreateCloudTableClient();
+                client = account.CreateCloudTableClient();
 
-                table = client.GetTableReference("Garage");
+                table = client.GetTableReference("Users");
                 await table.CreateIfNotExistsAsync();
 
                 Console.WriteLine(table.Uri.ToString());
@@ -216,17 +217,72 @@ namespace CounterFunctions
             {
                 Console.WriteLine(ex);
             }
-            // table = new CloudTable(siteURL);
-            //end_addition
-            Console.WriteLine("*********");
-            Console.WriteLine(await GetTheIDstatus(table, id));
-            return await GetTheIDstatus(table,id);
+            status st = new status();
+            
+            CloudTable garageTable = client.GetTableReference("Garage");
+            Boolean isInTheGarage = await isIdInTable(garageTable, "PartitionKey", id);
+            if (isInTheGarage && state.Equals("in"))
+            {
+                st.isOpen = "arleady in the Garage!";
+                return st;
+            }
+            else if (!isInTheGarage && state.Equals("out"))
+            {
+                st.isOpen = "arleady out of the Garage!";
+                return st;
+            }
+            else if (isInTheGarage && state.Equals("out")) {
+                //remove car from garage
+                TableOperation retrieve = TableOperation.Retrieve<TableEntity>(id,"car");
+                TableResult result = await garageTable.ExecuteAsync(retrieve);
+               // Console.WriteLine("here");
+                var deleteEntity = (TableEntity)result.Result;
+               // Console.WriteLine("here2");
+                TableOperation delete = TableOperation.Delete(deleteEntity);
+                await garageTable.ExecuteAsync(delete);
+                
+                st.isOpen = "open";
+                return st;
+            }
+            List<String> users = await GetUsersFromTable(table);
+            foreach (string regesterdUser in users)
+            {
+               
+                CloudTable usersTable = client.GetTableReference("Table00" + regesterdUser);
+                await usersTable.CreateIfNotExistsAsync();
+                Boolean isIdRegestered = await isIdInTable(usersTable, "RowKey", id);
+                if (isIdRegestered ) {
+                    //add to garage
+                    TableEntity newCar = new TableEntity();
+                    newCar.PartitionKey = id;
+                    newCar.RowKey = "car";
+
+                    TableOperation add = TableOperation.InsertOrReplace(newCar);
+                    await garageTable.ExecuteAsync(add);
+                    st.isOpen = "open";
+                    return st;
+                }
+            }
+            st.isOpen = "don't open";
+            return st;
         }
-        private static async Task<status> GetTheIDstatus(CloudTable cloudTable, string platId)
+        private static async Task<Boolean> isIdInTable(CloudTable table , String colName , string platId) {
+            TableQuery<PlateNumber> idQuery = new TableQuery<PlateNumber>()
+               .Where(TableQuery.GenerateFilterCondition(colName, QueryComparisons.Equal, platId));
+            TableQuerySegment<PlateNumber> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
+            PlateNumber plateNumber = queryResult.FirstOrDefault();
+            if (plateNumber == null)
+            {
+                return false;
+            }
+
+            return true;
+            }
+     /*   private static async Task<status> GetTheIDstatus(CloudTable garageTable, string platId,string state)
         {
             TableQuery<PlateNumber> idQuery = new TableQuery<PlateNumber>()
                 .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, platId));
-            TableQuerySegment<PlateNumber> queryResult = await cloudTable.ExecuteQuerySegmentedAsync(idQuery, null);
+            TableQuerySegment<PlateNumber> queryResult = await garageTable.ExecuteQuerySegmentedAsync(idQuery, null);
             PlateNumber plateNumber = queryResult.FirstOrDefault();
             status st = new status();
             st.isOpen = "open";
@@ -236,7 +292,7 @@ namespace CounterFunctions
             }
 
             return st;
-        }
+        }*/
         [FunctionName("update-User")]
         public static async Task<String> updateUser(
           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "update-User/{act}/{name}")] HttpRequestMessage request,
@@ -293,6 +349,7 @@ namespace CounterFunctions
                 newUser.PartitionKey = name;
                 newUser.RowKey = "";
                 newUser.Password = name;
+                newUser.UserType = "user";
 
                 TableOperation add = TableOperation.InsertOrReplace(newUser);
                 await usersTable.ExecuteAsync(add);
@@ -543,7 +600,7 @@ namespace CounterFunctions
             }
             else {
                 if (user.Password.Equals(userLoginRequest.Password)) {
-                    result = "true";
+                    result = user.UserType;
                 }
                 else { result = "false"; }
             }
