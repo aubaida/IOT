@@ -538,7 +538,7 @@ namespace CounterFunctions
                 Console.WriteLine(ex);
             }
             List<string> users;
-            if (user.Equals("admin")) { 
+            if (user.Equals("admin")) { //must be chaaaaaaange
                 users = await GetUsersFromTable(table);
             }else{
                 users = new List<string>();
@@ -547,9 +547,9 @@ namespace CounterFunctions
         
             List<User> cars = new List<User>();
             foreach (string regesterdUser in users) {
-                if (regesterdUser.Equals("admin")) {
+               /* if (regesterdUser.Equals("admin")) {
                     continue;
-                }
+                }*/
                 CloudTable usersTable = client.GetTableReference("Table00"+ regesterdUser);
                 await usersTable.CreateIfNotExistsAsync();
                 TableQuery<User> idQuery = new TableQuery<User>();
@@ -660,7 +660,176 @@ namespace CounterFunctions
             return JsonConvert.DeserializeObject<T>(connectionRequestJson);
         }
 
+        [FunctionName("get-requests")]
+        public static async Task<List<Request>> GetRequests(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-requests/{user}/{isApproved}")] HttpRequestMessage request,
+           string user,
+           Boolean isApproved,
+           ILogger log)
+        {
+            log.LogInformation("GetRequests");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+            Boolean isAdmin = false;
+
+        
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Requests");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            if (user.Equals("admin"))
+            { //must be chaaaaaaange
+                isAdmin = true;
+            }  
+
+            return await GetRequests(table , user , isAdmin ,isApproved );
+        }
+        private static async Task<List<Request>> GetRequests(CloudTable cloudTable, string userName ,Boolean isAdmin, Boolean isApproved )
+        {
+            TableQuery<Request> idQuery = null;
+
+            List<Request> requests = new List<Request>();
+            if (isAdmin)
+            {
+                idQuery = new TableQuery<Request>()
+            .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
+
+            }
+            else {
+                if (isApproved.Equals(true))
+                {
+                    idQuery = new TableQuery<Request>()
+                .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName))
+                .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.NotEqual, "waiting"));
+                }
+                else {
+                    idQuery = new TableQuery<Request>()
+                   .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName))
+                   .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
+                }
+            }
+            
+            TableQuerySegment<Request> queryResult = await cloudTable.ExecuteQuerySegmentedAsync(idQuery, null);
        
+            List<Request> cloudRequest = queryResult.Results;
+
+            return cloudRequest;
+        }
+        [FunctionName("get-action-request")]
+        public static async Task<string> GetActionRequest(
+           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-action-request/{act}/{user}/{owner}/{plateNum}")] HttpRequestMessage request,
+           string user,
+           string act,
+           string owner,
+           string plateNum,
+           ILogger log)
+        {
+            log.LogInformation("GetActionRequest");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+
+            //first get all users
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Requests");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            if (act.Equals("add"))
+            {
+                Request newRequest = new Request();
+                newRequest.PartitionKey = user;
+                newRequest.RowKey = plateNum;
+                newRequest.ownerName = owner;
+                newRequest.approved = "waiting";
+
+                TableOperation add = TableOperation.InsertOrReplace(newRequest);
+                await table.ExecuteAsync(add);
+            }
+            else {//remove 
+                TableOperation retrieve = TableOperation.Retrieve<Request>(user, plateNum);
+
+                TableResult result = await table.ExecuteAsync(retrieve);
+
+                var deleteEntity = (Request)result.Result;
+
+                TableOperation delete = TableOperation.Delete(deleteEntity);
+
+                await table.ExecuteAsync(delete);
+            }
+
+            return act;
+        }
+        [FunctionName("get-approve-request")] //if true must update the user table 
+        public static async Task<string> GetupdateRequest(//if we have to requests that contains the same id number???
+          [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-approve-request/{act}/{user}/{owner}/{plateNum}")] HttpRequestMessage request,
+          string user,
+          string act,
+          string owner,
+          string plateNum,
+          ILogger log)
+        {
+            log.LogInformation("GetActionRequest");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Requests");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+           
+              Request newRequest = new Request();
+              newRequest.PartitionKey = user;
+              newRequest.RowKey = plateNum;
+              newRequest.ownerName = owner;
+              newRequest.approved = act;
+
+              TableOperation add = TableOperation.InsertOrReplace(newRequest);
+              await table.ExecuteAsync(add);
+            
+
+
+            return "done";
+        }
+
+
     }
 
 
