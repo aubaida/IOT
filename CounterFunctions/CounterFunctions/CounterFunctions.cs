@@ -664,7 +664,7 @@ namespace CounterFunctions
         public static async Task<List<Request>> GetRequests(
            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-requests/{user}/{isApproved}")] HttpRequestMessage request,
            string user,
-           Boolean isApproved,
+           string isApproved,
            ILogger log)
         {
             log.LogInformation("GetRequests");
@@ -697,34 +697,47 @@ namespace CounterFunctions
 
             return await GetRequests(table , user , isAdmin ,isApproved );
         }
-        private static async Task<List<Request>> GetRequests(CloudTable cloudTable, string userName ,Boolean isAdmin, Boolean isApproved )
+        private static async Task<List<Request>> GetRequests(CloudTable cloudTable, string userName ,Boolean isAdmin, string isApproved )
         {
-            TableQuery<Request> idQuery = null;
-
+            string idQuery = null;
+        
             List<Request> requests = new List<Request>();
             if (isAdmin)
             {
-                idQuery = new TableQuery<Request>()
-            .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
+                idQuery = TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting");
 
             }
             else {
-                if (isApproved.Equals(true))
+                if (isApproved.Equals("true"))
                 {
-                    idQuery = new TableQuery<Request>()
-                .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName))
-                .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.NotEqual, "waiting"));
+                    idQuery = TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("approved", QueryComparisons.NotEqual, "waiting"));
+
+                    string deleteQuery = TableQuery.CombineFilters(
+                        idQuery,
+                       TableOperators.And,
+                       TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.LessThanOrEqual, DateTimeOffset.Now.AddDays(-1).Date));
+                    TableQuery<Request> deleteRequestQuery = new TableQuery<Request>().Where(deleteQuery);
+                    TableQuerySegment<Request> queryDelteResult = await cloudTable.ExecuteQuerySegmentedAsync(deleteRequestQuery, null);
+                    foreach (TableEntity entity in queryDelteResult.Results) {
+                        TableOperation delete = TableOperation.Delete(entity);
+                        await cloudTable.ExecuteAsync(delete);
+                    }
                 }
                 else {
-                    idQuery = new TableQuery<Request>()
-                   .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName))
-                   .Where(TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
+                    idQuery =TableQuery.CombineFilters(
+                   TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName),
+                   TableOperators.And,
+                   TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
                 }
             }
-            
-            TableQuerySegment<Request> queryResult = await cloudTable.ExecuteQuerySegmentedAsync(idQuery, null);
-       
-            List<Request> cloudRequest = queryResult.Results;
+          
+            TableQuery<Request> query = new TableQuery<Request>().Where(idQuery);
+            var results = await cloudTable.ExecuteQuerySegmentedAsync<Request>(query, null);
+
+            List<Request> cloudRequest = results.Results;
 
             return cloudRequest;
         }
@@ -828,8 +841,6 @@ namespace CounterFunctions
 
             return "done";
         }
-
-
     }
 
 
