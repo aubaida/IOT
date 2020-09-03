@@ -836,8 +836,16 @@ namespace CounterFunctions
 
               TableOperation add = TableOperation.InsertOrReplace(newRequest);
               await table.ExecuteAsync(add);
-            
 
+            if (act.Equals("true")) { //add the car
+
+                table = client.GetTableReference("Table00" + user);
+                await table.CreateIfNotExistsAsync();
+
+             
+
+                await updatePlateNumber(table, plateNum, owner, "add");
+             }
 
             return "done";
         }
