@@ -15,12 +15,13 @@ using System.Collections.Generic;
 
 namespace CounterFunctions
 {
-    
+
     public static class CounterFunctions
     {
         //add
         static RegistryManager registryManager;
         private static string connectionString = "HostName=FirstTry1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=pM+0OHYzhamTy1GSRFfasj7q7Hi2TARGlVr9yb7dNuk=";
+        private static string ownerName = "";
         //end_add
         private static readonly AzureSignalR SignalR = new AzureSignalR(Environment.GetEnvironmentVariable("AzureSignalRConnectionString"));
         //  static string accountName = "firsttry1";
@@ -200,7 +201,8 @@ namespace CounterFunctions
             log.LogInformation("Getting if to open or not.");
             //addition
             CloudTable table = null;
-            CloudTableClient client=null;
+            CloudTableClient client = null;
+
             try
             {
                 StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
@@ -218,9 +220,15 @@ namespace CounterFunctions
                 Console.WriteLine(ex);
             }
             status st = new status();
-            
+
             CloudTable garageTable = client.GetTableReference("Garage");
             Boolean isInTheGarage = await isIdInTable(garageTable, "PartitionKey", id);
+            /*get the avaliable places*/
+            TableQuery<availablePlaces> idQuery = new TableQuery<availablePlaces>()
+               .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, "places"));
+            TableQuerySegment<availablePlaces> queryResult = await garageTable.ExecuteQuerySegmentedAsync(idQuery, null);
+            availablePlaces places = queryResult.FirstOrDefault();
+
             if (isInTheGarage && state.Equals("in"))
             {
                 st.isOpen = "arleady in the Garage!";
@@ -231,42 +239,57 @@ namespace CounterFunctions
                 st.isOpen = "arleady out of the Garage!";
                 return st;
             }
-            else if (isInTheGarage && state.Equals("out")) {
+            else if (isInTheGarage && state.Equals("out"))
+            {
                 //remove car from garage
-                TableOperation retrieve = TableOperation.Retrieve<TableEntity>(id,"car");
+                TableOperation retrieve = TableOperation.Retrieve<TableEntity>(id, "car");
                 TableResult result = await garageTable.ExecuteAsync(retrieve);
-               // Console.WriteLine("here");
                 var deleteEntity = (TableEntity)result.Result;
-               // Console.WriteLine("here2");
                 TableOperation delete = TableOperation.Delete(deleteEntity);
                 await garageTable.ExecuteAsync(delete);
-                
+
                 st.isOpen = "open";
+                //add one to the avaliavle places
+                places.numOfPlaces = (int.Parse(places.numOfPlaces)+1).ToString();
+                TableOperation add = TableOperation.InsertOrReplace(places);
+                await garageTable.ExecuteAsync(add);
+                return st;
+            }
+            //in
+            if (int.Parse(places.numOfPlaces) == 0) {
+                st.isOpen = "don't open the Garage is FULL!";
                 return st;
             }
             List<String> users = await GetUsersFromTable(table);
             foreach (string regesterdUser in users)
             {
-               
+
                 CloudTable usersTable = client.GetTableReference("Table00" + regesterdUser);
                 await usersTable.CreateIfNotExistsAsync();
                 Boolean isIdRegestered = await isIdInTable(usersTable, "RowKey", id);
-                if (isIdRegestered ) {
+                if (isIdRegestered)
+                {
                     //add to garage
-                    TableEntity newCar = new TableEntity();
+                    Request newCar = new Request();
                     newCar.PartitionKey = id;
                     newCar.RowKey = "car";
+                    newCar.ownerName = ownerName;
 
                     TableOperation add = TableOperation.InsertOrReplace(newCar);
                     await garageTable.ExecuteAsync(add);
                     st.isOpen = "open";
+                    //update the avaliable places
+                    places.numOfPlaces = (int.Parse(places.numOfPlaces) - 1).ToString();
+                    TableOperation addOrReplace = TableOperation.InsertOrReplace(places);
+                    await garageTable.ExecuteAsync(addOrReplace);
                     return st;
                 }
             }
             st.isOpen = "don't open";
             return st;
         }
-        private static async Task<Boolean> isIdInTable(CloudTable table , String colName , string platId) {
+        private static async Task<Boolean> isIdInTable(CloudTable table, String colName, string platId)
+        {
             TableQuery<PlateNumber> idQuery = new TableQuery<PlateNumber>()
                .Where(TableQuery.GenerateFilterCondition(colName, QueryComparisons.Equal, platId));
             TableQuerySegment<PlateNumber> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
@@ -275,24 +298,10 @@ namespace CounterFunctions
             {
                 return false;
             }
-
+            ownerName = plateNumber.PartitionKey;
             return true;
-            }
-     /*   private static async Task<status> GetTheIDstatus(CloudTable garageTable, string platId,string state)
-        {
-            TableQuery<PlateNumber> idQuery = new TableQuery<PlateNumber>()
-                .Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, platId));
-            TableQuerySegment<PlateNumber> queryResult = await garageTable.ExecuteQuerySegmentedAsync(idQuery, null);
-            PlateNumber plateNumber = queryResult.FirstOrDefault();
-            status st = new status();
-            st.isOpen = "open";
-            if (plateNumber == null)
-            {
-                st.isOpen = "don't open";
-            }
+        }
 
-            return st;
-        }*/
         [FunctionName("update-User")]
         public static async Task<String> updateUser(
           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "update-User/{act}/{name}")] HttpRequestMessage request,
@@ -311,15 +320,15 @@ namespace CounterFunctions
                 CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
 
                 client = account.CreateCloudTableClient();
-                table = client.GetTableReference("Table00"+name);
-                
+                table = client.GetTableReference("Table00" + name);
+
                 Console.WriteLine(table.Uri.ToString());
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
             }
-            
+
             if (act.Equals("remove"))
             {
                 Console.Out.WriteLine("in remove");
@@ -335,11 +344,12 @@ namespace CounterFunctions
                 TableOperation delete = TableOperation.Delete(deleteEntity);
 
                 await usersTable.ExecuteAsync(delete);
-                
+
                 return act + " " + name;
 
             }
-            else if (act == "add") {
+            else if (act == "add")
+            {
                 Console.Out.WriteLine("in add");
                 await table.CreateIfNotExistsAsync();
                 CloudTable usersTable = client.GetTableReference("Users");
@@ -354,10 +364,10 @@ namespace CounterFunctions
                 TableOperation add = TableOperation.InsertOrReplace(newUser);
                 await usersTable.ExecuteAsync(add);
 
-                return act + " " + name ;
+                return act + " " + name;
 
             }
-            return act +" "+ name +" error in action";
+            return act + " " + name + " error in action";
 
         }
 
@@ -365,7 +375,7 @@ namespace CounterFunctions
         public static async Task<List<string>> GetUsers(
            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-All-Users/")] HttpRequestMessage request,
            [Table("Users")] CloudTable cloudTable,
-           
+
            ILogger log)
         {
             Console.WriteLine("in get-All-Users");
@@ -394,7 +404,7 @@ namespace CounterFunctions
         {
             TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
             List<string> users = new List<string>();
-            foreach (TableEntity entity in  await cloudTable.ExecuteQuerySegmentedAsync(idQuery,null))
+            foreach (TableEntity entity in await cloudTable.ExecuteQuerySegmentedAsync(idQuery, null))
             {
                 TableEntity user = new TableEntity();
                 user.PartitionKey = entity.PartitionKey;
@@ -425,7 +435,7 @@ namespace CounterFunctions
 
                 CloudTableClient client = account.CreateCloudTableClient();
 
-                table = client.GetTableReference("Table00"+user);
+                table = client.GetTableReference("Table00" + user);
                 await table.CreateIfNotExistsAsync();
 
                 Console.WriteLine(table.Uri.ToString());
@@ -434,8 +444,8 @@ namespace CounterFunctions
             {
                 Console.WriteLine(ex);
             }
- 
-            return await updatePlateNumber(table, id, owner , "add");
+
+            return await updatePlateNumber(table, id, owner, "add");
         }
 
         [FunctionName("remove-PlateNumber")]
@@ -472,23 +482,26 @@ namespace CounterFunctions
 
         private static async Task<String> updatePlateNumber(CloudTable cloudTable, string id, string owner, string action)
         {
-            if (action.Equals("add")) { 
-            try
+            if (action.Equals("add"))
             {
-                PlateNumber newPlate = new PlateNumber();
-                newPlate.PartitionKey = owner;
-                newPlate.RowKey = id;
+                try
+                {
+                    PlateNumber newPlate = new PlateNumber();
+                    newPlate.PartitionKey = owner;
+                    newPlate.RowKey = id;
 
-                TableOperation add = TableOperation.InsertOrReplace(newPlate);
-                await cloudTable.ExecuteAsync(add);
+                    TableOperation add = TableOperation.InsertOrReplace(newPlate);
+                    await cloudTable.ExecuteAsync(add);
+                }
+                catch (Exception e)
+                {
+                    return e.Message;
+                }
+                return "Success";
+                // action=='remove'
             }
-            catch (Exception e)
+            else
             {
-                return e.Message;
-            }
-            return "Success";
-            // action=='remove'
-            }else{
                 try
                 {
                     List<string> list = new List<string>();
@@ -538,19 +551,23 @@ namespace CounterFunctions
                 Console.WriteLine(ex);
             }
             List<string> users;
-            if (user.Equals("admin")) { //must be chaaaaaaange
+            if (user.Equals("admin"))
+            { //must be chaaaaaaange
                 users = await GetUsersFromTable(table);
-            }else{
+            }
+            else
+            {
                 users = new List<string>();
                 users.Add(user);
             }
-        
+
             List<User> cars = new List<User>();
-            foreach (string regesterdUser in users) {
-               /* if (regesterdUser.Equals("admin")) {
-                    continue;
-                }*/
-                CloudTable usersTable = client.GetTableReference("Table00"+ regesterdUser);
+            foreach (string regesterdUser in users)
+            {
+                /* if (regesterdUser.Equals("admin")) {
+                     continue;
+                 }*/
+                CloudTable usersTable = client.GetTableReference("Table00" + regesterdUser);
                 await usersTable.CreateIfNotExistsAsync();
                 TableQuery<User> idQuery = new TableQuery<User>();
                 foreach (User entity in await usersTable.ExecuteQuerySegmentedAsync(idQuery, null))
@@ -569,7 +586,7 @@ namespace CounterFunctions
            ILogger log)
         {
             log.LogInformation("is login.");
-            String result= "false";
+            String result = "false";
             CloudTable table = null;
             try
             {
@@ -598,8 +615,10 @@ namespace CounterFunctions
             {
                 result = "false";
             }
-            else {
-                if (user.Password.Equals(userLoginRequest.Password)) {
+            else
+            {
+                if (user.Password.Equals(userLoginRequest.Password))
+                {
                     result = user.UserType;
                 }
                 else { result = "false"; }
@@ -645,7 +664,7 @@ namespace CounterFunctions
             else
             {
                 user.Password = userLoginRequest.Password;
-                
+
                 TableOperation add = TableOperation.InsertOrReplace(user);
                 await table.ExecuteAsync(add);
                 result = "changed";
@@ -673,7 +692,7 @@ namespace CounterFunctions
             CloudTableClient client = null;
             Boolean isAdmin = false;
 
-        
+
             try
             {
                 StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
@@ -693,21 +712,22 @@ namespace CounterFunctions
             if (user.Equals("admin"))
             { //must be chaaaaaaange
                 isAdmin = true;
-            }  
+            }
 
-            return await GetRequests(table , user , isAdmin ,isApproved );
+            return await GetRequests(table, user, isAdmin, isApproved);
         }
-        private static async Task<List<Request>> GetRequests(CloudTable cloudTable, string userName ,Boolean isAdmin, string isApproved )
+        private static async Task<List<Request>> GetRequests(CloudTable cloudTable, string userName, Boolean isAdmin, string isApproved)
         {
             string idQuery = null;
-        
+
             List<Request> requests = new List<Request>();
             if (isAdmin)
             {
                 idQuery = TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting");
 
             }
-            else {
+            else
+            {
                 if (isApproved.Equals("true"))
                 {
                     idQuery = TableQuery.CombineFilters(
@@ -721,19 +741,21 @@ namespace CounterFunctions
                        TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.LessThanOrEqual, DateTimeOffset.Now.AddDays(-1).Date));
                     TableQuery<Request> deleteRequestQuery = new TableQuery<Request>().Where(deleteQuery);
                     TableQuerySegment<Request> queryDelteResult = await cloudTable.ExecuteQuerySegmentedAsync(deleteRequestQuery, null);
-                    foreach (TableEntity entity in queryDelteResult.Results) {
+                    foreach (TableEntity entity in queryDelteResult.Results)
+                    {
                         TableOperation delete = TableOperation.Delete(entity);
                         await cloudTable.ExecuteAsync(delete);
                     }
                 }
-                else {
-                    idQuery =TableQuery.CombineFilters(
+                else
+                {
+                    idQuery = TableQuery.CombineFilters(
                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, userName),
                    TableOperators.And,
                    TableQuery.GenerateFilterCondition("approved", QueryComparisons.Equal, "waiting"));
                 }
             }
-          
+
             TableQuery<Request> query = new TableQuery<Request>().Where(idQuery);
             var results = await cloudTable.ExecuteQuerySegmentedAsync<Request>(query, null);
 
@@ -783,7 +805,8 @@ namespace CounterFunctions
                 TableOperation add = TableOperation.InsertOrReplace(newRequest);
                 await table.ExecuteAsync(add);
             }
-            else {//remove 
+            else
+            {//remove 
                 TableOperation retrieve = TableOperation.Retrieve<Request>(user, plateNum);
 
                 TableResult result = await table.ExecuteAsync(retrieve);
@@ -827,27 +850,100 @@ namespace CounterFunctions
             {
                 Console.WriteLine(ex);
             }
-           
-              Request newRequest = new Request();
-              newRequest.PartitionKey = user;
-              newRequest.RowKey = plateNum;
-              newRequest.ownerName = owner;
-              newRequest.approved = act;
 
-              TableOperation add = TableOperation.InsertOrReplace(newRequest);
-              await table.ExecuteAsync(add);
+            Request newRequest = new Request();
+            newRequest.PartitionKey = user;
+            newRequest.RowKey = plateNum;
+            newRequest.ownerName = owner;
+            newRequest.approved = act;
 
-            if (act.Equals("true")) { //add the car
+            TableOperation add = TableOperation.InsertOrReplace(newRequest);
+            await table.ExecuteAsync(add);
+
+            if (act.Equals("true"))
+            { //add the car
 
                 table = client.GetTableReference("Table00" + user);
                 await table.CreateIfNotExistsAsync();
 
-             
+
 
                 await updatePlateNumber(table, plateNum, owner, "add");
-             }
+            }
 
             return "done";
+        }
+        [FunctionName("get-garage-content")] //if true must update the user table 
+        public static async Task<List<Request>> GetGarageNow(//if we have to requests that contains the same id number???
+         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-garage-content/")] HttpRequestMessage request,
+         ILogger log)
+        {
+            CloudTable table = null;
+            CloudTableClient client = null;
+            List<Request> cars = new List<Request>();
+            //first get all users
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Garage");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+            TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
+           
+
+            foreach(TableEntity entity in await table.ExecuteQuerySegmentedAsync(idQuery, null)){
+                cars.Add((Request)entity);
+            }
+
+            return cars;
+
+        }
+        [FunctionName("get-places-number")]
+        public static async Task<int> GetNumberOfPlaces(
+         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-places-number/")] HttpRequestMessage request,
+         ILogger log)
+        {
+            log.LogInformation("GetNumberOfPlaces");
+            //addition
+            CloudTable table = null;
+            CloudTableClient client = null;
+
+            try
+            {
+                StorageCredentials creds = new StorageCredentials(Environment.GetEnvironmentVariable("accountName"), Environment.GetEnvironmentVariable("accountKey"));
+                CloudStorageAccount account = new CloudStorageAccount(creds, useHttps: true);
+
+                client = account.CreateCloudTableClient();
+
+                table = client.GetTableReference("Garage");
+                await table.CreateIfNotExistsAsync();
+
+                Console.WriteLine(table.Uri.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+
+            /*get the avaliable places*/
+            TableQuery<availablePlaces> idQuery = new TableQuery<availablePlaces>()
+               .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, "places"));
+            TableQuerySegment<availablePlaces> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
+            availablePlaces places = queryResult.FirstOrDefault();
+            Console.Out.WriteLine("RowKey"+ places.RowKey);
+            return int.Parse(places.numOfPlaces);
+
+
         }
     }
 
