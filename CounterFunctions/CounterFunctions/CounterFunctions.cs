@@ -257,7 +257,13 @@ namespace CounterFunctions
                   new SignalRMessage
                   {
                       Target = "placesUpdate",
-                      Arguments = new [] { (Object)places.numOfPlaces }
+                      Arguments = new [] { places.numOfPlaces }
+                  });
+                await signalRMessages.AddAsync(
+                  new SignalRMessage
+                  {
+                      Target = "garageUpdate",
+                      Arguments = new[] { (Object)id }
                   });
                 TableOperation add = TableOperation.InsertOrReplace(places);
                 await garageTable.ExecuteAsync(add);
@@ -294,6 +300,12 @@ namespace CounterFunctions
                          Target = "placesUpdate",
                          Arguments = new[] { places.numOfPlaces }
                      }) ;
+                    await signalRMessages.AddAsync(
+                  new SignalRMessage
+                  {
+                      Target = "garageUpdate",
+                      Arguments = new[] { (Object)id }
+                  });
                     TableOperation addOrReplace = TableOperation.InsertOrReplace(places);
                     await garageTable.ExecuteAsync(addOrReplace);
                     return st;
@@ -778,12 +790,13 @@ namespace CounterFunctions
             return cloudRequest;
         }
         [FunctionName("get-action-request")]
-        public static async Task<string> GetActionRequest(
+        public static async Task<string> GetActionRequest(//*
            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-action-request/{act}/{user}/{owner}/{plateNum}")] HttpRequestMessage request,
            string user,
            string act,
            string owner,
            string plateNum,
+            [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
            ILogger log)
         {
             log.LogInformation("GetActionRequest");
@@ -818,6 +831,12 @@ namespace CounterFunctions
 
                 TableOperation add = TableOperation.InsertOrReplace(newRequest);
                 await table.ExecuteAsync(add);
+                await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = "requestUpdate",
+                     Arguments = new[] { "add"}
+                 });
             }
             else
             {//remove 
@@ -830,17 +849,24 @@ namespace CounterFunctions
                 TableOperation delete = TableOperation.Delete(deleteEntity);
 
                 await table.ExecuteAsync(delete);
+                await signalRMessages.AddAsync(
+               new SignalRMessage
+               {
+                   Target = "requestUpdate",
+                   Arguments = new[] { "remove:"+plateNum }
+               });
             }
 
             return act;
         }
         [FunctionName("get-approve-request")] //if true must update the user table 
-        public static async Task<string> GetupdateRequest(//if we have to requests that contains the same id number???
+        public static async Task<string> GetupdateRequest(//if we have to requests that contains the same id number??? //*
           [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-approve-request/{act}/{user}/{owner}/{plateNum}")] HttpRequestMessage request,
           string user,
           string act,
           string owner,
           string plateNum,
+           [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
           ILogger log)
         {
             log.LogInformation("GetActionRequest");
