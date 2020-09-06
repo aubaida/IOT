@@ -20,13 +20,13 @@ namespace CounterFunctions
     {
         //add
         static RegistryManager registryManager;
-        private static string connectionString = "HostName=FirstTry1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=pM+0OHYzhamTy1GSRFfasj7q7Hi2TARGlVr9yb7dNuk=";
+     //   private static string connectionString = "HostName=FirstTry1.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=pM+0OHYzhamTy1GSRFfasj7q7Hi2TARGlVr9yb7dNuk=";
         private static string ownerName = "";
         //end_add
         private static readonly AzureSignalR SignalR = new AzureSignalR(Environment.GetEnvironmentVariable("AzureSignalRConnectionString"));
         //  static string accountName = "firsttry1";
         //  static string accountKey = "pfXP7PSpVukhCQmIKLv44hRo93hnZWuyt3D/TVL5+ImwIeXX0BAOlMvhsBV96eD5rbS465e8I/6JgQmsV4tlzg==";
-        /*   [FunctionName("negotiate")]
+           [FunctionName("negotiate")]
            public static async Task<SignalRConnectionInfo> NegotiateConnection(
                [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage request,
                ILogger log)
@@ -46,7 +46,7 @@ namespace CounterFunctions
                    log.LogError(ex, "Failed to negotiate connection.");
                    throw;
                }
-           }
+           }/*
            //addition
            //public static CloudTable table;
            //end_addition
@@ -196,6 +196,7 @@ namespace CounterFunctions
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "get-isOpen/{id}/{state}")] HttpRequestMessage request,
             string id,
             string state,
+            [SignalR(HubName = "CounterHub")] IAsyncCollector<SignalRMessage> signalRMessages,
             ILogger log)
         {
             log.LogInformation("Getting if to open or not.");
@@ -251,6 +252,13 @@ namespace CounterFunctions
                 st.isOpen = "open";
                 //add one to the avaliavle places
                 places.numOfPlaces = (int.Parse(places.numOfPlaces)+1).ToString();
+                //signalR
+                await signalRMessages.AddAsync(
+                  new SignalRMessage
+                  {
+                      Target = "placesUpdate",
+                      Arguments = new [] { (Object)places.numOfPlaces }
+                  });
                 TableOperation add = TableOperation.InsertOrReplace(places);
                 await garageTable.ExecuteAsync(add);
                 return st;
@@ -274,12 +282,18 @@ namespace CounterFunctions
                     newCar.PartitionKey = id;
                     newCar.RowKey = "car";
                     newCar.ownerName = ownerName;
-
+                
                     TableOperation add = TableOperation.InsertOrReplace(newCar);
                     await garageTable.ExecuteAsync(add);
                     st.isOpen = "open";
                     //update the avaliable places
                     places.numOfPlaces = (int.Parse(places.numOfPlaces) - 1).ToString();
+                    await signalRMessages.AddAsync(
+                     new SignalRMessage
+                     {
+                         Target = "placesUpdate",
+                         Arguments = new[] { places.numOfPlaces }
+                     }) ;
                     TableOperation addOrReplace = TableOperation.InsertOrReplace(places);
                     await garageTable.ExecuteAsync(addOrReplace);
                     return st;
@@ -880,7 +894,7 @@ namespace CounterFunctions
         {
             CloudTable table = null;
             CloudTableClient client = null;
-            List<Request> cars = new List<Request>();
+
             //first get all users
             try
             {
@@ -898,14 +912,11 @@ namespace CounterFunctions
             {
                 Console.WriteLine(ex);
             }
-            TableQuery<TableEntity> idQuery = new TableQuery<TableEntity>();
+            TableQuery<Request> idQuery = new TableQuery<Request>()
+              .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, "car"));
+            TableQuerySegment<Request> queryResult = await table.ExecuteQuerySegmentedAsync(idQuery, null);
            
-
-            foreach(TableEntity entity in await table.ExecuteQuerySegmentedAsync(idQuery, null)){
-                cars.Add((Request)entity);
-            }
-
-            return cars;
+            return queryResult.Results;
 
         }
         [FunctionName("get-places-number")]
