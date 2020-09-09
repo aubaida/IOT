@@ -243,7 +243,7 @@ namespace CounterFunctions
             else if (isInTheGarage && state.Equals("out"))
             {
                 //remove car from garage
-                TableOperation retrieve = TableOperation.Retrieve<TableEntity>(id, "car");
+                TableOperation retrieve = TableOperation.Retrieve<Request>(id, "car");
                 TableResult result = await garageTable.ExecuteAsync(retrieve);
                 var deleteEntity = (TableEntity)result.Result;
                 TableOperation delete = TableOperation.Delete(deleteEntity);
@@ -265,6 +265,13 @@ namespace CounterFunctions
                       Target = "garageUpdate",
                       Arguments = new[] { (Object)id }
                   });
+                await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = ((Request)result.Result).UserName+"Notify",
+                     Arguments = new[] { ((Request)result.Result).ownerName+" left the garage" }
+                 });
+
                 TableOperation add = TableOperation.InsertOrReplace(places);
                 await garageTable.ExecuteAsync(add);
                 return st;
@@ -288,7 +295,8 @@ namespace CounterFunctions
                     newCar.PartitionKey = id;
                     newCar.RowKey = "car";
                     newCar.ownerName = ownerName;
-                
+                    newCar.UserName = regesterdUser;
+
                     TableOperation add = TableOperation.InsertOrReplace(newCar);
                     await garageTable.ExecuteAsync(add);
                     st.isOpen = "open";
@@ -306,6 +314,12 @@ namespace CounterFunctions
                       Target = "garageUpdate",
                       Arguments = new[] { (Object)id }
                   });
+                    await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = regesterdUser + "Notify",
+                     Arguments = new[] { ownerName + " entered the garage" }
+                 });
                     TableOperation addOrReplace = TableOperation.InsertOrReplace(places);
                     await garageTable.ExecuteAsync(addOrReplace);
                     return st;
@@ -837,6 +851,13 @@ namespace CounterFunctions
                      Target = "requestUpdate",
                      Arguments = new[] { "add"}
                  });
+                await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = "AddRequestNotify",
+                     Arguments = new[] { user }
+                 });
+
             }
             else
             {//remove 
@@ -855,6 +876,13 @@ namespace CounterFunctions
                    Target = "requestUpdate",
                    Arguments = new[] { "remove:"+plateNum }
                });
+                await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = "RemoveRequestNotify",
+                     Arguments = new[] { user }
+                 });
+
             }
 
             return act;
@@ -899,7 +927,12 @@ namespace CounterFunctions
 
             TableOperation add = TableOperation.InsertOrReplace(newRequest);
             await table.ExecuteAsync(add);
-
+            await signalRMessages.AddAsync(
+                 new SignalRMessage
+                 {
+                     Target = user + "NotifyFeeds",
+                     Arguments = new[] { "" }
+                 });
             if (act.Equals("true"))
             { //add the car
 

@@ -9,6 +9,7 @@ namespace CounterFunctions
     {
         public string approved { get; set; }
         public string ownerName { get; set; }
+        public string UserName { get; set; }
 
     }
 }
