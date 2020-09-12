@@ -1,0 +1,57 @@
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <Camera2Basic.AutoFitTextureView
+        android:id="@+id/texture"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_above="@id/texture"
+        android:background="#4285f4"
+        android:id="@+id/picture">
+        <TextView
+		android:id="@+id/carId"
+		android:layout_gravity="center"
+		android:gravity="center"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+		android:textStyle="bold"
+		android:textSize="@dimen/abc_action_bar_progress_bar_size"
+		android:text=""/>
+        <TextView
+		    android:text="Gate status:"
+		    android:layout_gravity="center"
+		    android:gravity="center"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+		    android:textStyle="bold"
+		    android:textSize="@dimen/abc_action_button_min_width_overflow_material"
+	    />
+	
+	    <TextView
+		    android:text="don't open"
+		    android:id="@+id/_status"
+		    android:layout_gravity="center"
+		    android:gravity="center"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+		    android:textStyle="bold"
+		    android:textSize="@dimen/abc_action_button_min_width_overflow_material"
+	    />
+        <Button
+            android:text="in"
+            android:id="@+id/in_out"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:layout_width="@dimen/abc_action_bar_stacked_tab_max_width"
+            android:layout_height="wrap_content"
+            android:textSize="20dp"/>
+    </LinearLayout>
+</RelativeLayout>
