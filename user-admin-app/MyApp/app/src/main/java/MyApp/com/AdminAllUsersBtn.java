@@ -43,18 +43,18 @@ public class AdminAllUsersBtn extends AppCompatActivity {
             @Override
             public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
 
-
-
         if (response.isSuccessful()) {
-            AdminAllUsersBtn.Users.clear();
-            MainActivity.users_cars.clear();
-            MainActivity.users_passwords.clear();
             final String MyResponse = response.body().string();
             AdminAllUsersBtn.this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
 
-                        mutex.lock();
+                        try {
+                            mutex.lock();
+
+                        AdminAllUsersBtn.Users.clear();
+                        MainActivity.users_cars.clear();
+                        MainActivity.users_passwords.clear();
                         String[] parts = MyResponse.split(",");
                         String str = "";
                         for (int i = 0; i < parts.length; i++) {
@@ -69,13 +69,16 @@ public class AdminAllUsersBtn extends AppCompatActivity {
                             Users.add(part);
                             str = str + part + " ";
                         }
-                        if(Users.contains("admin")){
+                        if(Users.contains("admin")) {
                             Users.remove("admin");
                         }
-                        System.out.println(str);
                         ListView1.setAdapter(MyAdapter1);
                         MyAdapter1.notifyDataSetChanged();
-
+                    }catch(Exception e){
+                            e.printStackTrace();
+                        }finally{
+                            mutex.unlock();
+                        }
                 }
             });
 
@@ -92,7 +95,7 @@ public class AdminAllUsersBtn extends AppCompatActivity {
         Button RemoveBtn = (Button) findViewById(R.id.RemoveBtn);
         final EditText InputText = (EditText) findViewById(R.id.editText2);
 
-        //setup list view: Reminder of the static problem !!
+
         final ArrayAdapter MyAdapter1 = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, Users);
 
         ListView1.setOnItemClickListener(new AdapterView.OnItemClickListener(){
@@ -105,8 +108,7 @@ public class AdminAllUsersBtn extends AppCompatActivity {
         });
 
 
-            // adding items from azure:
-            //NoRepetation+=1;
+
         try {
             updateUserView( ListView1,MyAdapter1);
         } catch (IOException e) {
@@ -117,12 +119,20 @@ public class AdminAllUsersBtn extends AppCompatActivity {
                 @RequiresApi(api = Build.VERSION_CODES.N)
                 @Override
                 public void onClick(View v) {
+
+
                     int c = 0;
-                    final String stringval = InputText.getText().toString();
-                    for (int i = 0; i < Users.size(); i++) {
-                        if (Users.get(i).equals(stringval)) {
-                            c++;
+                    final String stringval;
+                    try {
+                        mutex.lock();
+                        stringval = InputText.getText().toString();
+                        for (int i = 0; i < Users.size(); i++) {
+                            if (Users.get(i).equals(stringval)) {
+                                c++;
+                            }
                         }
+                    }finally{
+                        mutex.unlock();
                     }
                     if(stringval.equals("admin")){
                         c=-1;

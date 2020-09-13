@@ -31,6 +31,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 
 import io.reactivex.Single;
@@ -123,7 +124,6 @@ public class admin extends AppCompatActivity {
             }
 
         });
-        System.out.println("hubUrl = "+SignalrURL[0]+", access = "+ AccessKey[0]);
         OkHttpClient client = new OkHttpClient();
         String url = "https://counterfunctions20200429005139.azurewebsites.net/api/get-places-number/?";
         Request request2 = new Request.Builder()
@@ -143,119 +143,116 @@ public class admin extends AppCompatActivity {
                     admin.this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
+                            int numOfTry=0;
                             while(!nogotiatedFlag){ // if there is no nogotiation keep waiting
                                 try {
                                     System.out.println("go to sleep");
                                     Thread.sleep(200);
-                                } catch (InterruptedException e) {
+                                    numOfTry++;
+                                    if(numOfTry==50){
+                                        throw new Exception("Waited for the request too much time !");
+                                    }
+                                } catch (Exception e) {
                                     e.printStackTrace();
+                                    return;
                                 }
                             }
 
-                            System.out.println("exampleRunnable thread started");
-                            hub = HubConnectionBuilder.create(SignalrURL[0]).withAccessTokenProvider(Single.defer(() -> {
-                                return Single.just(AccessKey[0]);
+                            try {
+                                hub = HubConnectionBuilder.create(SignalrURL[0]).withAccessTokenProvider(Single.defer(() -> {
+                                    return Single.just(AccessKey[0]);
 
-                            }))
-                                    .build();
-                            System.out.println("exampleRunnable thread build");
-                            hub.on("placesUpdate", new Action1<String>() {
-                                @Override
-                                public void invoke(String params) {
+                                }))
+                                        .build();
 
-                                      AvailablePlaces.setText(params);
-                                }
-                            }, String.class);
-                            hub.on("adminNotify", new Action1<String>() {
-                                @Override
-                                public void invoke(String params) {
-                                    String title = "New Update!";
-                                    String message = params;
+                                hub.on("placesUpdate", new Action1<String>() {
+                                    @Override
+                                    public void invoke(String params) {
 
-                                    Notification notification = new NotificationCompat.Builder(admin.this,App.CHANNEL_1)
-                                            .setSmallIcon(R.drawable.ic_one)
-                                            .setContentTitle(title)
-                                            .setContentText(message)
-                                            .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                                            .build();
-
-                                    notificationManager.notify(1,notification);
-
-                                }
-                            }, String.class);
-                            System.out.println("exampleRunnable thread hubon");
-                            hub.start();
-                            System.out.println("exampleRunnable thread start");
-
-
-                            AvailablePlaces.setText(MyResponse);
-                            //adding request
-                            hub.on("AddRequestNotify", new Action1<String>() {
-                                @Override
-                                public void invoke(String params) {
-                                    String title = "New Update!";
-                                    String message = params + " made new request";
-
-                                    Notification notification = new NotificationCompat.Builder(admin.this,App.CHANNEL_1)
-                                            .setSmallIcon(R.drawable.ic_one)
-                                            .setContentTitle(title)
-                                            .setContentText(message)
-                                            .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                                            .build();
-
-                                    notificationManager.notify(1,notification);
-                                    if(admiRequestClass==null) {
-                                        admiRequestClass = new AdminRequestsBtn();
+                                        AvailablePlaces.setText(params);
                                     }
-                                    admiRequestClass.getRequests(null,null,true,admin.this);
+                                }, String.class);
+                                hub.on("adminNotify", new Action1<String>() {
+                                    @Override
+                                    public void invoke(String params) {
+                                        String title = "New Update!";
+                                        String message = params;
 
+                                        Notification notification = new NotificationCompat.Builder(admin.this, App.CHANNEL_1)
+                                                .setSmallIcon(R.drawable.ic_one)
+                                                .setContentTitle(title)
+                                                .setContentText(message)
+                                                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                                                .build();
 
-                                }
-                            }, String.class);
-                            hub.on("RemoveRequestNotify", new Action1<String>() {
-                                @Override
-                                public void invoke(String params) {
-                                    String title = "New Update!";
-                                    String message = params + " removed his request";
-                                    Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                                    Notification notification = new NotificationCompat.Builder(admin.this,App.CHANNEL_1)
-                                            .setSmallIcon(R.drawable.ic_one)
-                                            .setContentTitle(title)
-                                            .setContentText(message)
-                                            .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                                            .build();
-                                    long[] vibrate = { 0, 100, 200, 300 };
-                                    notification.vibrate=vibrate;
-                                    notification.sound = alarmSound;
+                                        notificationManager.notify(1, notification);
 
-                                    notificationManager.notify(1,notification);
-                                    if(admiRequestClass==null) {
-                                        admiRequestClass = new AdminRequestsBtn();
                                     }
-                                    admiRequestClass.getRequests(null,null,true,admin.this);
+                                }, String.class);
 
-                                }
-                            }, String.class);
+                                hub.start();
+
+
+                                AvailablePlaces.setText(MyResponse);
+                                //adding request
+                                hub.on("AddRequestNotify", new Action1<String>() {
+                                    @Override
+                                    public void invoke(String params) {
+                                        String title = "New Update!";
+                                        String message = params + " made new request";
+
+                                        Notification notification = new NotificationCompat.Builder(admin.this, App.CHANNEL_1)
+                                                .setSmallIcon(R.drawable.ic_one)
+                                                .setContentTitle(title)
+                                                .setContentText(message)
+                                                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                                                .build();
+
+                                        notificationManager.notify(1, notification);
+                                        if (admiRequestClass == null) {
+                                            admiRequestClass = new AdminRequestsBtn();
+                                        }
+                                        admiRequestClass.getRequests(null, null, true, admin.this);
+
+
+                                    }
+                                }, String.class);
+                                hub.on("RemoveRequestNotify", new Action1<String>() {
+                                    @Override
+                                    public void invoke(String params) {
+                                        String title = "New Update!";
+                                        String message = params + " removed his request";
+                                        Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                                        Notification notification = new NotificationCompat.Builder(admin.this, App.CHANNEL_1)
+                                                .setSmallIcon(R.drawable.ic_one)
+                                                .setContentTitle(title)
+                                                .setContentText(message)
+                                                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                                                .build();
+                                        long[] vibrate = {0, 100, 200, 300};
+                                        notification.vibrate = vibrate;
+                                        notification.sound = alarmSound;
+
+                                        notificationManager.notify(1, notification);
+                                        if (admiRequestClass == null) {
+                                            admiRequestClass = new AdminRequestsBtn();
+                                        }
+                                        admiRequestClass.getRequests(null, null, true, admin.this);
+
+                                    }
+                                }, String.class);
+                            }catch(Exception e){
+                                e.printStackTrace();
+                            }
                         }
                     });
 
                 }
             }
         });
-
-    /*  class exampleRunnable implements Runnable{
-          @Override
-          public void run() {
-
-          }
-      }*/
-     //   exampleRunnable runnable = new exampleRunnable();
-     //   new Thread(runnable).start();
-        //to stop connection
-        //hub.stop();
 
         AllCarsBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -275,7 +272,12 @@ public class admin extends AppCompatActivity {
         if(admiRequestClass==null) {
             admiRequestClass = new AdminRequestsBtn();
         }
-        admiRequestClass.getRequests(null,null,true,admin.this);
+        try {
+            admiRequestClass.getRequests(null,null,true,admin.this);
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
 
 
 

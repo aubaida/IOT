@@ -70,12 +70,8 @@ public class AdminRequestsBtn extends AppCompatActivity {
         Button RejectBtn = (Button) findViewById(R.id.RejectBtn);
         input_CarNum=(EditText)findViewById(R.id.editText2);
         input_Owner = (EditText)findViewById(R.id.editText1);
-      //  progressDialog= new ProgressDialog(AdminRequestsBtn.this);
         final ArrayAdapter MyAdapter1 = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, Requests);
-
-    isHere=true;
-
-      //  final HashMap<String,String> rowUsers = new HashMap<String,String>();
+        isHere=true;
 
         ListView1.setOnItemClickListener(new AdapterView.OnItemClickListener(){
             @Override
@@ -136,28 +132,29 @@ public class AdminRequestsBtn extends AppCompatActivity {
                                     AdminRequestsBtn.this.runOnUiThread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            mutex.lock();
-                                            String row = getUser + " : {O: " + Owner + " , C_plate: " + CarNum + " }";
-                                            Requests.remove(finalI);
-                                            ListView1.setAdapter(MyAdapter1);
-                                            runOnUiThread(new Runnable() {
-                                                public void run() {
-                                                    final Toast toast = Toast.makeText(getApplicationContext(), "Request Approved Successfully", Toast.LENGTH_LONG);
-                                                    toast.show();
-                                                }});
-                                            System.out.println(AdminRequestsBtn.Requests.size());
-                                            if(AdminRequestsBtn.Requests.size()>0){
-                                                admin.ReqBtn.setText("Check Requests!");
-                                                //ReqBtn.setBackgroundResource(R.color.ReqColor);
-                                                admin.ReqBtn.setBackgroundColor(Color.RED);
-                                            }
-                                            else{
-                                                admin.ReqBtn.setText("Requests");
-                                                admin.ReqBtn.setBackgroundResource(android.R.drawable.btn_default);
-                                            }
-                                            MyAdapter1.notifyDataSetChanged();
-                                            progressDialog.dismiss();
-                                            mutex.unlock();
+                                            try {
+                                                mutex.lock();
+                                                String row = getUser + " : {O: " + Owner + " , C_plate: " + CarNum + " }";
+                                                Requests.remove(finalI);
+                                                ListView1.setAdapter(MyAdapter1);
+                                                runOnUiThread(new Runnable() {
+                                                    public void run() {
+                                                        final Toast toast = Toast.makeText(getApplicationContext(), "Request Approved Successfully", Toast.LENGTH_LONG);
+                                                        toast.show();
+                                                    }
+                                                });
+                                                System.out.println(AdminRequestsBtn.Requests.size());
+                                                if (AdminRequestsBtn.Requests.size() > 0) {
+                                                    admin.ReqBtn.setText("Check Requests!");
+                                                    //ReqBtn.setBackgroundResource(R.color.ReqColor);
+                                                    admin.ReqBtn.setBackgroundColor(Color.RED);
+                                                } else {
+                                                    admin.ReqBtn.setText("Requests");
+                                                    admin.ReqBtn.setBackgroundResource(android.R.drawable.btn_default);
+                                                }
+                                                MyAdapter1.notifyDataSetChanged();
+                                                progressDialog.dismiss();
+                                            }finally{ mutex.unlock();}
                                         }
                                     });
                                 }
@@ -222,33 +219,38 @@ public class AdminRequestsBtn extends AppCompatActivity {
                                     AdminRequestsBtn.this.runOnUiThread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            String row = getUser + " : {O: " + Owner + " , C_plate: " + CarNum + " }";
-                                            Requests.remove(finalI);
-                                            ListView1.setAdapter(MyAdapter1);
-                                            runOnUiThread(new Runnable() {
-                                                public void run() {
-                                                    final Toast toast = Toast.makeText(getApplicationContext(), "Request Rejected Successfully", Toast.LENGTH_LONG);
-                                                    toast.show();
-                                                }});
-                                            System.out.println(AdminRequestsBtn.Requests.size());
-                                            if(AdminRequestsBtn.Requests.size()>0){
-                                                admin.ReqBtn.setText("Check Requests!");
-                                                //ReqBtn.setBackgroundResource(R.color.ReqColor);
-                                                admin.ReqBtn.setBackgroundColor(Color.RED);
+                                            try {
+                                                mutex.lock();
+                                                String row = getUser + " : {O: " + Owner + " , C_plate: " + CarNum + " }";
+                                                Requests.remove(finalI);
+                                                ListView1.setAdapter(MyAdapter1);
+                                                runOnUiThread(new Runnable() {
+                                                    public void run() {
+                                                        final Toast toast = Toast.makeText(getApplicationContext(), "Request Rejected Successfully", Toast.LENGTH_LONG);
+                                                        toast.show();
+                                                    }
+                                                });
+
+                                                if (AdminRequestsBtn.Requests.size() > 0) {
+                                                    admin.ReqBtn.setText("Check Requests!");
+                                                    //ReqBtn.setBackgroundResource(R.color.ReqColor);
+                                                    admin.ReqBtn.setBackgroundColor(Color.RED);
+                                                } else {
+                                                    admin.ReqBtn.setText("Requests");
+                                                    admin.ReqBtn.setBackgroundResource(android.R.drawable.btn_default);
+                                                }
+                                                MyAdapter1.notifyDataSetChanged();
+                                                progressDialog.dismiss();
+                                            }finally{
+                                                mutex.unlock();
                                             }
-                                            else{
-                                                admin.ReqBtn.setText("Requests");
-                                                admin.ReqBtn.setBackgroundResource(android.R.drawable.btn_default);
-                                            }
-                                            MyAdapter1.notifyDataSetChanged();
-                                            progressDialog.dismiss();
                                         }
                                     });
                                 }
                             }
                         });
 
-                        //MyAdapter1.notifyDataSetChanged();
+
                         input_Owner.setText("");
                         input_CarNum.setText("");
                         c++;

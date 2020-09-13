@@ -139,26 +139,10 @@ public class MainActivity extends AppCompatActivity {
                                         final Toast toast = Toast.makeText(getApplicationContext(), "Error", Toast.LENGTH_LONG);
                                         toast.show();
                                     }
-                                });;
+                                });
                             }
-
-                            /*if(mMessage.equals("\"true\"")){
-                                Intent intent = new Intent(MainActivity.this, user.class);
-                                intent.putExtra("NAME",_txtUser.getText().toString()); // to pass the username to another layout
-                                startActivity(intent);
-                            }else {
-                                runOnUiThread(new Runnable() {
-                                    public void run() {
-                                        final Toast toast = Toast.makeText(getApplicationContext(), "Error", Toast.LENGTH_LONG);
-                                        toast.show();
-                                    }
-                                });;
-                            }*/
                         }
                     });
-                //}
-                //Toast.makeText(getApplicationContext(), "Error", Toast.LENGTH_LONG).show();
-
             }
         });
     }

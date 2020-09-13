@@ -117,7 +117,6 @@ public class AllRegisteredCarsBtn extends AppCompatActivity {
                                 } catch (JSONException e) {
                                     e.printStackTrace();
                                 }
-                                System.out.println(RegCar);
                                 String row = RegCar + " ; Owner is : " + Owner;
                                 //System.out.println(Owner);
                                 //AllRegisteredCarsBtnRow row = new AllRegisteredCarsBtnRow(RegCar,Owner);

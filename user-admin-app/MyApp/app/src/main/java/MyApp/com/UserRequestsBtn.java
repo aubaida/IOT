@@ -360,10 +360,6 @@ public class UserRequestsBtn extends AppCompatActivity {
                     final String CarNum = input_CarNum.getText().toString();
                     final String Owner = input_Owner.getText().toString();
                     String row = UserID + " : {O: " + Owner + " , C_plate: " + CarNum + " }";
-              /*  System.out.println("***********************************");
-                    System.out.println(RequestsList);
-                    System.out.println("row = "+row);
-                System.out.println("***********************************");*/
                     if (RequestsList.contains(row)) {
                         String remove_url = "https://counterfunctions20200429005139.azurewebsites.net/api/get-action-request/remove/"+UserID+"/"+Owner+"/"+CarNum;
                         OkHttpClient client3 = new OkHttpClient();
